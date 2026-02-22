@@ -165,6 +165,7 @@ export default function MindMapEditor({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [pendingFocusNodeId, setPendingFocusNodeId] = useState<string | null>(null);
+  const [longPressActionNodeId, setLongPressActionNodeId] = useState<string | null>(null);
   const [visualStyle] = useState<MindVisualStyle>('branch');
   const editorRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -355,6 +356,7 @@ export default function MindMapEditor({
         setEditingNodeId(newId);
         setPendingFocusNodeId(newId);
       }
+      setLongPressActionNodeId(null);
     },
     [applyLayout, edges, nodes, setEdges, setNodes]
   );
@@ -371,6 +373,7 @@ export default function MindMapEditor({
     setEdges(arrangedEdges);
     setEditingNodeId(null);
     setPendingFocusNodeId(null);
+    setLongPressActionNodeId(null);
     window.setTimeout(() => {
       editorRef.current?.focus();
     }, 0);
@@ -388,46 +391,55 @@ export default function MindMapEditor({
     [addChild, edges]
   );
 
+  const removeNode = useCallback(
+    (nodeId: string | null) => {
+      if (!nodeId || nodeId === 'root') {
+        return;
+      }
+
+      const parentId = getParentId(nodeId, edges);
+      const childIds = edges
+        .filter((edge) => edge.source === nodeId)
+        .map((edge) => edge.target);
+
+      const nextNodes = nodes.filter((node) => node.id !== nodeId);
+      const baseEdges = edges.filter((edge) => edge.source !== nodeId && edge.target !== nodeId);
+
+      const adoptedEdges =
+        parentId === null
+          ? []
+          : childIds
+              .filter(
+                (childId) =>
+                  !baseEdges.some((edge) => edge.source === parentId && edge.target === childId)
+              )
+              .map(
+                (childId): Edge => ({
+                  id: `${parentId}-${childId}`,
+                  source: parentId,
+                  target: childId,
+                  type: 'smoothstep'
+                })
+              );
+
+      const nextEdges = [...baseEdges, ...adoptedEdges];
+
+      const selectedAfterDelete = parentId ?? nextNodes[0]?.id ?? null;
+      const { arrangedNodes, arrangedEdges } = applyLayout(nextNodes, nextEdges, selectedAfterDelete);
+      setNodes(arrangedNodes);
+      setEdges(arrangedEdges);
+      setEditingNodeId(null);
+      setLongPressActionNodeId(null);
+    },
+    [applyLayout, edges, nodes, setEdges, setNodes]
+  );
+
   const removeSelected = useCallback(() => {
-    if (!selectedNodeId || selectedNodeId === 'root') {
+    if (!selectedNodeId) {
       return;
     }
-
-    const parentId = getParentId(selectedNodeId, edges);
-    const childIds = edges
-      .filter((edge) => edge.source === selectedNodeId)
-      .map((edge) => edge.target);
-
-    const nextNodes = nodes.filter((node) => node.id !== selectedNodeId);
-    const baseEdges = edges.filter(
-      (edge) => edge.source !== selectedNodeId && edge.target !== selectedNodeId
-    );
-
-    const adoptedEdges =
-      parentId === null
-        ? []
-        : childIds
-            .filter(
-              (childId) =>
-                !baseEdges.some((edge) => edge.source === parentId && edge.target === childId)
-            )
-            .map(
-              (childId): Edge => ({
-                id: `${parentId}-${childId}`,
-                source: parentId,
-                target: childId,
-                type: 'smoothstep'
-              })
-            );
-
-    const nextEdges = [...baseEdges, ...adoptedEdges];
-
-    const selectedAfterDelete = parentId ?? nextNodes[0]?.id ?? null;
-    const { arrangedNodes, arrangedEdges } = applyLayout(nextNodes, nextEdges, selectedAfterDelete);
-    setNodes(arrangedNodes);
-    setEdges(arrangedEdges);
-    setEditingNodeId(null);
-  }, [applyLayout, edges, nodes, selectedNodeId, setEdges, setNodes]);
+    removeNode(selectedNodeId);
+  }, [removeNode, selectedNodeId]);
 
   const moveSelection = useCallback(
     (delta: 1 | -1) => {
@@ -460,6 +472,7 @@ export default function MindMapEditor({
     setEdges(arrangedEdges);
     setEditingNodeId(null);
     setPendingFocusNodeId(null);
+    setLongPressActionNodeId(null);
   }, [applyLayout, edges, nodes, selectedNodeId, setEdges, setNodes]);
 
   useEffect(() => {
@@ -579,6 +592,10 @@ export default function MindMapEditor({
             selectNode(id);
             setEditingNodeId(id);
           },
+          onLongPress: (id: string) => {
+            selectNode(id);
+            setLongPressActionNodeId(id);
+          },
           onCommitEdit: commitEdit
         }
       })),
@@ -603,6 +620,13 @@ export default function MindMapEditor({
     });
   }, [colorLookup, edges, visualStyle]);
 
+  const canEditSelected = Boolean(selectedNodeId);
+  const canAddSibling = Boolean(selectedNodeId && getParentId(selectedNodeId, edges));
+  const canDeleteSelected = Boolean(selectedNodeId && selectedNodeId !== 'root');
+  const actionNodeId = longPressActionNodeId ?? selectedNodeId;
+  const canActionSibling = Boolean(actionNodeId && getParentId(actionNodeId, edges));
+  const canActionDelete = Boolean(actionNodeId && actionNodeId !== 'root');
+
   return (
     <div className="editor-shell" onKeyDown={handleEditorKeyDown} tabIndex={0} ref={editorRef}>
       <div className="editor-canvas" ref={canvasRef}>
@@ -625,6 +649,99 @@ export default function MindMapEditor({
           <Controls />
         </ReactFlow>
       </div>
+      <div className="mobile-action-bar" role="toolbar" aria-label="Mind map actions">
+        <button
+          type="button"
+          onClick={() => {
+            if (selectedNodeId) {
+              addChild(selectedNodeId, true);
+            }
+          }}
+          disabled={!canEditSelected}
+        >
+          + Child
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (selectedNodeId) {
+              addSibling(selectedNodeId, true);
+            }
+          }}
+          disabled={!canAddSibling}
+        >
+          + Sibling
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (selectedNodeId) {
+              setEditingNodeId(selectedNodeId);
+            }
+          }}
+          disabled={!canEditSelected}
+        >
+          Rename
+        </button>
+        <button type="button" onClick={organizeMap}>
+          Organize
+        </button>
+        <button type="button" onClick={removeSelected} disabled={!canDeleteSelected}>
+          Delete
+        </button>
+      </div>
+      {longPressActionNodeId ? (
+        <div className="node-action-sheet-backdrop" onClick={() => setLongPressActionNodeId(null)}>
+          <div className="node-action-sheet" onClick={(event) => event.stopPropagation()}>
+            <h4>Node actions</h4>
+            <div className="node-action-grid">
+              <button
+                type="button"
+                onClick={() => {
+                  addChild(longPressActionNodeId, true);
+                }}
+              >
+                Add Child
+              </button>
+              <button
+                type="button"
+                disabled={!canActionSibling}
+                onClick={() => {
+                  addSibling(longPressActionNodeId, true);
+                }}
+              >
+                Add Sibling
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  selectNode(longPressActionNodeId);
+                  setEditingNodeId(longPressActionNodeId);
+                  setLongPressActionNodeId(null);
+                }}
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                disabled={!canActionDelete}
+                onClick={() => {
+                  removeNode(longPressActionNodeId);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+            <button
+              type="button"
+              className="node-action-cancel"
+              onClick={() => setLongPressActionNodeId(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

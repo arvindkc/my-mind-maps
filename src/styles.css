@@ -432,6 +432,7 @@ body.is-resizing-panels {
   display: flex;
   height: 100%;
   flex-direction: column;
+  position: relative;
 }
 
 .editor-shell:focus {
@@ -440,6 +441,84 @@ body.is-resizing-panels {
 
 .editor-canvas {
   flex: 1;
+}
+
+.mobile-action-bar {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  z-index: 30;
+  max-width: calc(100% - 16px);
+  overflow-x: auto;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(188, 201, 227, 0.75);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 24px rgba(24, 36, 68, 0.14);
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-action-bar button {
+  white-space: nowrap;
+  padding: 0.35rem 0.58rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.mobile-action-bar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.node-action-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: rgba(15, 23, 42, 0.16);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0.75rem;
+}
+
+.node-action-sheet {
+  width: min(460px, 100%);
+  border-radius: 14px;
+  border: 1px solid rgba(190, 203, 229, 0.9);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 16px 36px rgba(18, 29, 58, 0.22);
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.node-action-sheet h4 {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #22304f;
+}
+
+.node-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.node-action-grid button,
+.node-action-cancel {
+  border-radius: 10px;
+  padding: 0.5rem 0.55rem;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.node-action-cancel {
+  width: 100%;
 }
 
 .mind-node {
@@ -551,5 +630,18 @@ body.is-resizing-panels {
   .canvas-icons {
     top: 8px;
     right: 8px;
+  }
+
+  .mobile-action-bar {
+    display: inline-flex;
+  }
+
+  .react-flow__controls,
+  .react-flow__minimap {
+    display: none;
+  }
+
+  .editor-canvas {
+    padding-bottom: 64px;
   }
 }

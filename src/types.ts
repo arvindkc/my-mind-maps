@@ -10,6 +10,7 @@ export type MindNodeData = {
   onChangeLabel?: (nodeId: string, nextLabel: string) => void;
   onStartEdit?: (nodeId: string) => void;
   onCommitEdit?: (nodeId: string) => void;
+  onLongPress?: (nodeId: string) => void;
 };
 
 export type OutlineItem = {

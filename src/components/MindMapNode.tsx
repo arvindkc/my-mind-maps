@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from 'react';
-import type { CSSProperties, KeyboardEvent } from 'react';
+import type { CSSProperties, KeyboardEvent, PointerEvent } from 'react';
 import { Handle, Position } from '@xyflow/react';
 import type { Node, NodeProps } from '@xyflow/react';
 import type { MindNodeData } from '../types';
@@ -8,6 +8,8 @@ type MindFlowNode = Node<MindNodeData, 'mind'>;
 
 function MindMapNode({ id, data, selected }: NodeProps<MindFlowNode>) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     if (!data.editing) {
@@ -68,6 +70,35 @@ function MindMapNode({ id, data, selected }: NodeProps<MindFlowNode>) {
     );
   };
 
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const handlePointerDown = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
+      return;
+    }
+
+    longPressTriggeredRef.current = false;
+    clearLongPressTimer();
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      data.onLongPress?.(id);
+    }, 480);
+  };
+
+  const handlePointerEnd = (event: PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
+      return;
+    }
+    clearLongPressTimer();
+  };
+
+  useEffect(() => () => clearLongPressTimer(), []);
+
   return (
     <div
       className={`mind-node ${selected ? 'is-selected' : ''} ${isBranch ? 'is-branch' : 'is-boxed'}`}
@@ -89,6 +120,10 @@ function MindMapNode({ id, data, selected }: NodeProps<MindFlowNode>) {
         <button
           type="button"
           className={`mind-node-label ${isBranch ? 'is-branch' : ''}`}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
+          onPointerLeave={handlePointerEnd}
           onDoubleClick={() => data.onStartEdit?.(id)}
         >
           {data.label}
